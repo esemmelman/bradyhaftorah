@@ -32,6 +32,7 @@ let selectedGroup = null;
 let recorder = null;
 let recorderStream = null;
 let chunks = [];
+let stopRecordingTimer = null;
 let activeAudio = null;
 let hoveredGroupId = null;
 
@@ -205,10 +206,32 @@ async function openGroup(id) {
 }
 
 recordButton.addEventListener('click', async () => {
-  if (recorder?.state === 'recording') { recorder.stop(); return; }
+  if (recorder?.state === 'recording') {
+    recordButton.disabled = true;
+    recordButton.textContent = 'Finishing…';
+    status.textContent = 'Finishing the recording without clipping the final syllable…';
+    stopRecordingTimer = setTimeout(() => {
+      stopRecordingTimer = null;
+      if (recorder?.state === 'recording') recorder.stop();
+    }, 400);
+    return;
+  }
   try {
     const recordingGroup = selectedGroup;
-    recorderStream = await navigator.mediaDevices.getUserMedia({ audio:true }); chunks = [];
+    try {
+      recorderStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: { ideal: 48000 },
+          channelCount: { ideal: 1 },
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
+      });
+    } catch (error) {
+      recorderStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+    chunks = [];
     const mimeType = preferredRecordingType();
     recorder = new MediaRecorder(recorderStream, mimeType ? { mimeType, audioBitsPerSecond: 256000 } : undefined);
     recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
@@ -223,7 +246,8 @@ recordButton.addEventListener('click', async () => {
       } catch (error) { status.textContent = 'The recording could not be saved. Please record it again.'; }
       finally { recordButton.disabled = false; recordButton.classList.remove('recording'); }
     };
-    recorder.start(); recordButton.classList.add('recording'); recordButton.textContent = '■ Stop';
+    recorder.start(1000); recordButton.classList.add('recording'); recordButton.textContent = '■ Stop';
+    status.textContent = 'Recording in high quality with automatic voice processing disabled.';
   } catch { status.textContent = 'Microphone permission is needed to record.'; }
 });
 
@@ -294,6 +318,10 @@ audioToggle.addEventListener('change', () => {
   if (!audioEnabled) stopAudio();
   playButton.disabled = !audioEnabled || !selectedGroup || !recordings.has(selectedGroup.id);
 });
-dialog.addEventListener('close', () => { if (recorder?.state === 'recording') recorder.stop(); selectedGroup = null; });
+dialog.addEventListener('close', () => {
+  if (stopRecordingTimer) { clearTimeout(stopRecordingTimer); stopRecordingTimer = null; }
+  if (recorder?.state === 'recording') recorder.stop();
+  selectedGroup = null;
+});
 render();
 loadRemoteState();
