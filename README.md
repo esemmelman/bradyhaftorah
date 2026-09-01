@@ -1,0 +1,10 @@
+# Brady Haftarah Trainer
+
+An interactive, static haftarah trainer for **I Kings 1:40–45**, patterned after the Brady Torah trainer.
+
+Open `index.html` directly, or serve the folder locally. To publish with GitHub Pages, enable Pages for the repository's main branch.
+
+- Select words in one verse to save a phrase.
+- Select a highlighted phrase to record or play it.
+- Select a verse number to play its recorded phrases in order.
+- Phrase groupings and recordings are stored only in the current browser.
