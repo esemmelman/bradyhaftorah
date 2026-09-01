@@ -16,8 +16,16 @@ const phraseNode = document.querySelector('#recorder-phrase');
 const recordButton = document.querySelector('#record-button');
 const playButton = document.querySelector('#play-button');
 const deleteButton = document.querySelector('#delete-recording-button');
-const STORAGE_KEY = 'brady-haftorah-groups-kings-7-40-45-v1';
-let groups = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+const SUPABASE_URL = 'https://fgomaujsdblpzxhnnqrg.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_JOUqLZDnfGu_yCa6k6FVDQ_AYwpr72i';
+const SUPABASE_STORAGE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnb21hdWpzZGJscHp4aG5ucXJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNjM3MjYsImV4cCI6MjA5OTgzOTcyNn0.1iMPI_7F_8ioNVnuThxqAKfMfD7G4NbyXilXZEERScw';
+const GROUP_TABLE = 'brady_haftorah_kings_7_40_45_highlight_groups_v1';
+const RECORDING_TABLE = 'brady_haftorah_kings_7_40_45_group_recordings_v1';
+const RECORDING_BUCKET = 'brady-haftorah-kings-7-40-45-group-recordings-v1';
+const LEGACY_STORAGE_KEY = 'brady-haftorah-groups-kings-7-40-45-v1';
+let groups = [];
+const recordings = new Map();
+let remoteReady = false;
 let showTrope = true;
 let audioEnabled = true;
 let selectedGroup = null;
@@ -29,9 +37,99 @@ let hoveredGroupId = null;
 
 function wordsFor(verse) { return VERSES[verse - 40].split(/\s+/); }
 function phraseFor(group) { return wordsFor(group.verse).slice(group.start, group.end + 1).join(' '); }
-function saveGroups() { localStorage.setItem(STORAGE_KEY, JSON.stringify(groups)); }
 function displayText(text) { return showTrope ? text : text.replace(/[\u0591-\u05AF]/g, ''); }
 function groupAt(verse, word) { return groups.find(group => group.verse === verse && word >= group.start && word <= group.end); }
+function apiHeaders(extra = {}) { return { apikey: SUPABASE_KEY, 'Content-Type': 'application/json', ...extra }; }
+function recordingUrl(recording) { return `${SUPABASE_URL}/storage/v1/object/public/${RECORDING_BUCKET}/${recording.object_path}?v=${encodeURIComponent(recording.updated_at || recording.byte_size)}`; }
+function recordingExtension(mimeType) { if (mimeType.includes('ogg')) return 'ogg'; if (mimeType.includes('mp4')) return 'mp4'; return 'webm'; }
+function preferredRecordingType() { const types = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4']; return types.find(type => MediaRecorder.isTypeSupported(type)) || ''; }
+
+async function uploadRecording(groupId, blob) {
+  const mimeType = blob.type.split(';')[0] || 'audio/webm';
+  const objectPath = `groups/${groupId}.${recordingExtension(mimeType)}`;
+  const upload = await fetch(`${SUPABASE_URL}/storage/v1/object/${RECORDING_BUCKET}/${objectPath}`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_STORAGE_ANON_KEY, Authorization: `Bearer ${SUPABASE_STORAGE_ANON_KEY}`, 'Content-Type': mimeType, 'x-upsert': 'true' },
+    body: blob
+  });
+  if (!upload.ok) throw new Error('Audio upload failed');
+  const metadata = await fetch(`${SUPABASE_URL}/rest/v1/${RECORDING_TABLE}?on_conflict=highlight_group_id`, {
+    method: 'POST', headers: apiHeaders({ Prefer: 'resolution=merge-duplicates,return=representation' }),
+    body: JSON.stringify({ highlight_group_id: groupId, object_path: objectPath, mime_type: mimeType, byte_size: blob.size, updated_at: new Date().toISOString() })
+  });
+  if (!metadata.ok) throw new Error('Recording metadata save failed');
+  const [saved] = await metadata.json(); recordings.set(groupId, saved);
+}
+
+async function deleteRemoteRecording(groupId) {
+  const recording = recordings.get(groupId);
+  if (recording) {
+    const objectResponse = await fetch(`${SUPABASE_URL}/storage/v1/object/${RECORDING_BUCKET}/${recording.object_path}`, {
+      method: 'DELETE', headers: { apikey: SUPABASE_STORAGE_ANON_KEY, Authorization: `Bearer ${SUPABASE_STORAGE_ANON_KEY}` }
+    });
+    if (!objectResponse.ok && objectResponse.status !== 404) throw new Error('Recording object delete failed');
+  }
+  const metadataResponse = await fetch(`${SUPABASE_URL}/rest/v1/${RECORDING_TABLE}?highlight_group_id=eq.${groupId}`, { method: 'DELETE', headers: apiHeaders() });
+  if (!metadataResponse.ok) throw new Error('Recording metadata delete failed');
+  recordings.delete(groupId);
+}
+
+function openLegacyDb() {
+  return new Promise(resolve => {
+    const request = indexedDB.open('brady-haftorah-audio-kings-7-40-45', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('recordings');
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+  });
+}
+
+async function getLegacyRecording(id) {
+  const db = await openLegacyDb();
+  if (!db) return null;
+  return new Promise(resolve => {
+    const request = db.transaction('recordings', 'readonly').objectStore('recordings').get(id);
+    request.onsuccess = () => { db.close(); resolve(request.result || null); };
+    request.onerror = () => { db.close(); resolve(null); };
+  });
+}
+
+async function migrateLocalData() {
+  let legacyGroups;
+  try { legacyGroups = JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY) || '[]'); } catch { legacyGroups = []; }
+  if (!Array.isArray(legacyGroups) || !legacyGroups.length) return;
+  for (const legacy of legacyGroups) {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${GROUP_TABLE}?on_conflict=verse,start_word,end_word`, {
+      method: 'POST', headers: apiHeaders({ Prefer: 'resolution=ignore-duplicates,return=representation' }),
+      body: JSON.stringify({ verse: legacy.verse, start_word: legacy.start, end_word: legacy.end, color: legacy.color })
+    });
+    if (!response.ok) throw new Error('Local phrase migration failed');
+    let [saved] = await response.json();
+    if (!saved) {
+      const lookup = await fetch(`${SUPABASE_URL}/rest/v1/${GROUP_TABLE}?verse=eq.${legacy.verse}&start_word=eq.${legacy.start}&end_word=eq.${legacy.end}&select=id`, { headers: apiHeaders() });
+      [saved] = await lookup.json();
+    }
+    const blob = await getLegacyRecording(legacy.id);
+    if (saved && blob) await uploadRecording(saved.id, blob);
+  }
+  localStorage.removeItem(LEGACY_STORAGE_KEY);
+}
+
+async function loadRemoteState() {
+  try {
+    await migrateLocalData();
+    const [groupResponse, recordingResponse] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/${GROUP_TABLE}?select=id,verse,start_word,end_word,color&order=id.asc`, { headers: apiHeaders() }),
+      fetch(`${SUPABASE_URL}/rest/v1/${RECORDING_TABLE}?select=highlight_group_id,object_path,mime_type,byte_size,updated_at`, { headers: apiHeaders() })
+    ]);
+    if (!groupResponse.ok || !recordingResponse.ok) throw new Error('Supabase load failed');
+    groups = (await groupResponse.json()).map(item => ({ id: item.id, verse: item.verse, start: item.start_word, end: item.end_word, color: item.color }));
+    recordings.clear(); (await recordingResponse.json()).forEach(item => recordings.set(item.highlight_group_id, item));
+    remoteReady = true; render();
+    status.textContent = 'Select words to create a phrase, or hover over a recorded phrase to hear it.';
+  } catch (error) {
+    status.textContent = 'Saved phrases and recordings could not be loaded. Please refresh and try again.';
+  }
+}
 
 function render() {
   passage.replaceChildren();
@@ -55,11 +153,12 @@ function render() {
   });
 }
 
-passage.addEventListener('mouseup', event => {
+passage.addEventListener('mouseup', async event => {
   const clicked = event.target.closest('[data-group-id]');
   const selection = window.getSelection();
   if ((!selection || selection.isCollapsed) && clicked) { openGroup(clicked.dataset.groupId); return; }
   if (!selection || selection.isCollapsed || !selection.rangeCount) return;
+  if (!remoteReady) { selection.removeAllRanges(); status.textContent = 'Please wait for saved phrases to finish loading.'; return; }
   const range = selection.getRangeAt(0);
   const selected = [...passage.querySelectorAll('.word')].filter(word => { try { return range.intersectsNode(word); } catch { return false; } });
   if (!selected.length) return;
@@ -70,52 +169,59 @@ passage.addEventListener('mouseup', event => {
   const start = Math.min(...indices), end = Math.max(...indices);
   const overlaps = groups.filter(group => group.verse === verse && group.start <= end && group.end >= start);
   if (overlaps.length) {
-    groups = groups.filter(group => !overlaps.includes(group));
-    Promise.all(overlaps.map(group => deleteRecording(group.id))).catch(() => {});
-    status.textContent = `Cleared the selected phrase in verse ${verse}.`;
+    try {
+      await Promise.all(overlaps.map(group => deleteRemoteRecording(group.id)));
+      const ids = overlaps.map(group => group.id).join(',');
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${GROUP_TABLE}?id=in.(${ids})`, { method: 'DELETE', headers: apiHeaders() });
+      if (!response.ok) throw new Error('Phrase delete failed');
+      groups = groups.filter(group => !overlaps.includes(group));
+      status.textContent = `Cleared the selected phrase in verse ${verse}.`;
+    } catch (error) { status.textContent = 'The phrase could not be cleared. Please try again.'; }
   } else {
-    groups.push({ id: crypto.randomUUID(), verse, start, end, color: groups.length && groups.at(-1).color === 1 ? 2 : 1 });
-    status.textContent = `Saved a phrase in verse ${verse}. Select it to record audio.`;
+    const color = groups.length && groups.at(-1).color === 1 ? 2 : 1;
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${GROUP_TABLE}`, {
+        method: 'POST', headers: apiHeaders({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ verse, start_word: start, end_word: end, color })
+      });
+      if (!response.ok) throw new Error('Phrase save failed');
+      const [saved] = await response.json();
+      groups.push({ id: saved.id, verse, start, end, color });
+      status.textContent = `Saved a phrase in verse ${verse}. Select it to record audio.`;
+    } catch (error) { status.textContent = 'The phrase could not be saved. Please try again.'; }
   }
-  selection.removeAllRanges(); saveGroups(); render();
+  selection.removeAllRanges(); render();
 });
 
 async function openGroup(id) {
-  selectedGroup = groups.find(group => group.id === id);
+  selectedGroup = groups.find(group => group.id === Number(id));
   if (!selectedGroup) return;
   phraseNode.textContent = displayText(phraseFor(selectedGroup));
-  const exists = await getRecording(id);
+  const exists = recordings.has(selectedGroup.id);
   playButton.disabled = !exists || !audioEnabled;
   deleteButton.disabled = !exists;
+  recordButton.textContent = exists ? '● Record again' : '● Record';
   dialog.showModal();
 }
-
-function openDb() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('brady-haftorah-audio-kings-7-40-45', 1);
-    request.onupgradeneeded = () => request.result.createObjectStore('recordings');
-    request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
-  });
-}
-async function dbAction(mode, action) {
-  const db = await openDb();
-  return new Promise((resolve, reject) => { const tx = db.transaction('recordings', mode); const req = action(tx.objectStore('recordings')); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); tx.oncomplete = () => db.close(); });
-}
-const getRecording = id => dbAction('readonly', store => store.get(id));
-const putRecording = (id, blob) => dbAction('readwrite', store => store.put(blob, id));
-const deleteRecording = id => dbAction('readwrite', store => store.delete(id));
 
 recordButton.addEventListener('click', async () => {
   if (recorder?.state === 'recording') { recorder.stop(); return; }
   try {
+    const recordingGroup = selectedGroup;
     recorderStream = await navigator.mediaDevices.getUserMedia({ audio:true }); chunks = [];
-    recorder = new MediaRecorder(recorderStream);
+    const mimeType = preferredRecordingType();
+    recorder = new MediaRecorder(recorderStream, mimeType ? { mimeType, audioBitsPerSecond: 256000 } : undefined);
     recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
     recorder.onstop = async () => {
       recorderStream.getTracks().forEach(track => track.stop());
-      await putRecording(selectedGroup.id, new Blob(chunks, { type:recorder.mimeType }));
-      recordButton.classList.remove('recording'); recordButton.textContent = '● Record again'; playButton.disabled = !audioEnabled; deleteButton.disabled = false;
-      status.textContent = `Recording saved for verse ${selectedGroup.verse}.`;
+      recordButton.disabled = true;
+      const group = recordingGroup;
+      try {
+        await uploadRecording(group.id, new Blob(chunks, { type:recorder.mimeType || mimeType || 'audio/webm' }));
+        recordButton.textContent = '● Record again'; playButton.disabled = !audioEnabled; deleteButton.disabled = false;
+        status.textContent = `Recording saved to Supabase for verse ${group.verse}.`;
+      } catch (error) { status.textContent = 'The recording could not be saved. Please record it again.'; }
+      finally { recordButton.disabled = false; recordButton.classList.remove('recording'); }
     };
     recorder.start(); recordButton.classList.add('recording'); recordButton.textContent = '■ Stop';
   } catch { status.textContent = 'Microphone permission is needed to record.'; }
@@ -123,14 +229,13 @@ recordButton.addEventListener('click', async () => {
 
 async function playGroup(group, mark = true, stillRelevant = () => true) {
   if (!audioEnabled) return false;
-  const blob = await getRecording(group.id); if (!blob) return false;
+  const recording = recordings.get(group.id); if (!recording) return false;
   if (!stillRelevant()) return false;
   stopAudio();
-  const url = URL.createObjectURL(blob); activeAudio = new Audio(url);
+  const url = recordingUrl(recording); activeAudio = new Audio(url);
   if (mark) passage.querySelectorAll(`[data-group-id="${group.id}"]`).forEach(node => node.classList.add('audio-active'));
   const playingAudio = activeAudio;
   await new Promise(resolve => { playingAudio.onended = resolve; playingAudio.onerror = resolve; playingAudio.play().catch(resolve); });
-  URL.revokeObjectURL(url);
   if (activeAudio === playingAudio) {
     passage.querySelectorAll('.audio-active').forEach(node => node.classList.remove('audio-active'));
     activeAudio = null;
@@ -139,17 +244,23 @@ async function playGroup(group, mark = true, stillRelevant = () => true) {
 }
 function stopAudio() { if (activeAudio) { activeAudio.pause(); activeAudio = null; } passage.querySelectorAll('.audio-active').forEach(node => node.classList.remove('audio-active')); }
 playButton.addEventListener('click', () => selectedGroup && playGroup(selectedGroup));
-deleteButton.addEventListener('click', async () => { if (!selectedGroup) return; await deleteRecording(selectedGroup.id); playButton.disabled = true; deleteButton.disabled = true; recordButton.textContent = '● Record'; status.textContent = 'Recording deleted.'; });
+deleteButton.addEventListener('click', async () => {
+  if (!selectedGroup) return;
+  try {
+    await deleteRemoteRecording(selectedGroup.id);
+    playButton.disabled = true; deleteButton.disabled = true; recordButton.textContent = '● Record'; status.textContent = 'Recording deleted from Supabase.';
+  } catch (error) { status.textContent = 'The recording could not be deleted. Please try again.'; }
+});
 
 passage.addEventListener('mouseover', async event => {
   const target = event.target.closest('[data-group-id]');
   if (!target || !audioEnabled) return;
-  const id = target.dataset.groupId;
+  const id = Number(target.dataset.groupId);
   if (hoveredGroupId === id) return;
   hoveredGroupId = id;
   const group = groups.find(item => item.id === id);
   if (!group) return;
-  const recording = await getRecording(id);
+  const recording = recordings.get(id);
   if (hoveredGroupId !== id) return;
   if (!recording) {
     status.textContent = `This phrase in verse ${group.verse} has no recording yet. Select it to record one.`;
@@ -161,9 +272,9 @@ passage.addEventListener('mouseover', async event => {
 
 passage.addEventListener('mouseout', event => {
   const target = event.target.closest('[data-group-id]');
-  if (!target || target.dataset.groupId !== hoveredGroupId) return;
+  if (!target || Number(target.dataset.groupId) !== hoveredGroupId) return;
   const next = event.relatedTarget?.closest?.('[data-group-id]');
-  if (next?.dataset.groupId === hoveredGroupId) return;
+  if (next && Number(next.dataset.groupId) === hoveredGroupId) return;
   hoveredGroupId = null;
   stopAudio();
 });
@@ -178,6 +289,11 @@ passage.addEventListener('click', async event => {
 });
 
 tropeToggle.addEventListener('click', () => { showTrope = !showTrope; tropeToggle.classList.toggle('active', showTrope); tropeToggle.setAttribute('aria-pressed', String(showTrope)); render(); if (selectedGroup) phraseNode.textContent = displayText(phraseFor(selectedGroup)); });
-audioToggle.addEventListener('change', () => { audioEnabled = audioToggle.checked; if (!audioEnabled) stopAudio(); playButton.disabled = !audioEnabled; });
+audioToggle.addEventListener('change', () => {
+  audioEnabled = audioToggle.checked;
+  if (!audioEnabled) stopAudio();
+  playButton.disabled = !audioEnabled || !selectedGroup || !recordings.has(selectedGroup.id);
+});
 dialog.addEventListener('close', () => { if (recorder?.state === 'recording') recorder.stop(); selectedGroup = null; });
 render();
+loadRemoteState();
