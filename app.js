@@ -25,6 +25,7 @@ let recorder = null;
 let recorderStream = null;
 let chunks = [];
 let activeAudio = null;
+let hoveredGroupId = null;
 
 function wordsFor(verse) { return VERSES[verse - 40].split(/\s+/); }
 function phraseFor(group) { return wordsFor(group.verse).slice(group.start, group.end + 1).join(' '); }
@@ -120,18 +121,52 @@ recordButton.addEventListener('click', async () => {
   } catch { status.textContent = 'Microphone permission is needed to record.'; }
 });
 
-async function playGroup(group, mark = true) {
+async function playGroup(group, mark = true, stillRelevant = () => true) {
   if (!audioEnabled) return false;
   const blob = await getRecording(group.id); if (!blob) return false;
+  if (!stillRelevant()) return false;
   stopAudio();
   const url = URL.createObjectURL(blob); activeAudio = new Audio(url);
   if (mark) passage.querySelectorAll(`[data-group-id="${group.id}"]`).forEach(node => node.classList.add('audio-active'));
-  await new Promise(resolve => { activeAudio.onended = resolve; activeAudio.onerror = resolve; activeAudio.play().catch(resolve); });
-  URL.revokeObjectURL(url); passage.querySelectorAll('.audio-active').forEach(node => node.classList.remove('audio-active')); activeAudio = null; return true;
+  const playingAudio = activeAudio;
+  await new Promise(resolve => { playingAudio.onended = resolve; playingAudio.onerror = resolve; playingAudio.play().catch(resolve); });
+  URL.revokeObjectURL(url);
+  if (activeAudio === playingAudio) {
+    passage.querySelectorAll('.audio-active').forEach(node => node.classList.remove('audio-active'));
+    activeAudio = null;
+  }
+  return true;
 }
 function stopAudio() { if (activeAudio) { activeAudio.pause(); activeAudio = null; } passage.querySelectorAll('.audio-active').forEach(node => node.classList.remove('audio-active')); }
 playButton.addEventListener('click', () => selectedGroup && playGroup(selectedGroup));
 deleteButton.addEventListener('click', async () => { if (!selectedGroup) return; await deleteRecording(selectedGroup.id); playButton.disabled = true; deleteButton.disabled = true; recordButton.textContent = '● Record'; status.textContent = 'Recording deleted.'; });
+
+passage.addEventListener('mouseover', async event => {
+  const target = event.target.closest('[data-group-id]');
+  if (!target || !audioEnabled) return;
+  const id = target.dataset.groupId;
+  if (hoveredGroupId === id) return;
+  hoveredGroupId = id;
+  const group = groups.find(item => item.id === id);
+  if (!group) return;
+  const recording = await getRecording(id);
+  if (hoveredGroupId !== id) return;
+  if (!recording) {
+    status.textContent = `This phrase in verse ${group.verse} has no recording yet. Select it to record one.`;
+    return;
+  }
+  status.textContent = `Playing the saved phrase in verse ${group.verse}.`;
+  playGroup(group, true, () => hoveredGroupId === id);
+});
+
+passage.addEventListener('mouseout', event => {
+  const target = event.target.closest('[data-group-id]');
+  if (!target || target.dataset.groupId !== hoveredGroupId) return;
+  const next = event.relatedTarget?.closest?.('[data-group-id]');
+  if (next?.dataset.groupId === hoveredGroupId) return;
+  hoveredGroupId = null;
+  stopAudio();
+});
 
 passage.addEventListener('click', async event => {
   const button = event.target.closest('.verse-number'); if (!button || !audioEnabled) return;

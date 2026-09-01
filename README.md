@@ -5,6 +5,6 @@ An interactive, static haftarah trainer for **I Kings 7:40–45**, patterned aft
 Open `index.html` directly, or serve the folder locally. To publish with GitHub Pages, enable Pages for the repository's main branch.
 
 - Select words in one verse to save a phrase.
-- Select a highlighted phrase to record or play it.
+- Select a highlighted phrase to record or play it, or hover over it to play its saved recording.
 - Select a verse number to play its recorded phrases in order.
 - Phrase groupings and recordings are stored only in the current browser.
