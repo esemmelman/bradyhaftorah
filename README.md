@@ -10,3 +10,4 @@ Open `index.html` directly, or serve the folder locally. To publish with GitHub 
 - Phrase groupings and recordings are shared through dedicated tables and a dedicated Storage bucket in the `bnaimitzvah` Supabase project.
 - Recording requests 48 kHz mono audio, disables browser voice processing where supported, and preserves a short tail so final syllables are not clipped.
 - Verse playback detects and removes leading and trailing silence, retaining a subtle 75 ms scheduled pause between phrases.
+- Recording controls are hidden in the finished trainer; saved phrase and verse playback remain available.
