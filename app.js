@@ -343,7 +343,7 @@ async function playTrimmedVerse(queue, button, verse) {
         status.textContent = `Playing verse ${verse}: phrase ${index + 1} of ${clips.length}.`;
       }, delay));
       if (index === clips.length - 1) source.onended = resolve;
-      startAt += clip.duration + .015;
+      startAt += clip.duration + .075;
     });
   });
   await finished;
