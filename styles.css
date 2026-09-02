@@ -19,7 +19,7 @@ h1 { margin:0 0 18px; font-size:clamp(1.35rem,3vw,2rem); font-weight:400; }
 .audio-toggle input:focus-visible + .audio-toggle-track,.display-toggle:focus-visible,.verse-number:focus-visible,button:focus-visible { outline:3px solid rgba(54,90,71,.4); outline-offset:3px; }
 .display-toggle { min-width:84px; border:1px solid #cab98f; border-radius:999px; padding:9px 16px; color:var(--ink); background:#fffaf0; cursor:pointer; font:600 .8rem/1 Arial,sans-serif; }
 .display-toggle:hover,.display-toggle.active { border-color:var(--green); color:white; background:var(--green); }
-.passage-card { position:relative; width:100%; padding:clamp(54px,8vw,88px) clamp(25px,7vw,80px) 50px; border:1px solid rgba(82,70,45,.22); border-radius:4px; background:rgba(255,253,247,.91); box-shadow:0 20px 55px rgba(72,57,31,.14),inset 0 0 55px rgba(183,133,53,.04); }
+.passage-card { position:relative; width:100%; padding:clamp(54px,8vw,88px) clamp(25px,7vw,80px) 50px; border:1px solid rgba(82,70,45,.22); border-radius:4px; background:rgba(255,253,247,.91); box-shadow:0 20px 55px rgba(72,57,31,.14),inset 0 0 55px rgba(183,133,53,.04); user-select:none; -webkit-user-select:none; }
 .passage-card::before,.passage-card::after { content:"◆"; position:absolute; top:18px; color:var(--gold); font-size:.65rem; }
 .passage-card::before { left:22px; } .passage-card::after { right:22px; }
 .verse-row { display:flex; align-items:baseline; gap:.35em; text-align:right; font-family:"Frank Ruhl Libre","Times New Roman",serif; font-size:clamp(1.7rem,4.1vw,2.85rem); line-height:1.9; }

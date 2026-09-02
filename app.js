@@ -116,7 +116,6 @@ async function migrateLocalData() {
 
 async function loadRemoteState() {
   try {
-    await migrateLocalData();
     const [groupResponse, recordingResponse] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/${GROUP_TABLE}?verse=lte.42&select=id,verse,start_word,end_word,color&order=id.asc`, { headers: apiHeaders() }),
       fetch(`${SUPABASE_URL}/rest/v1/${RECORDING_TABLE}?select=highlight_group_id,object_path,mime_type,byte_size,updated_at`, { headers: apiHeaders() })
@@ -153,43 +152,7 @@ function render() {
   });
 }
 
-passage.addEventListener('mouseup', async event => {
-  const selection = window.getSelection();
-  if (!selection || selection.isCollapsed || !selection.rangeCount) return;
-  if (!remoteReady) { selection.removeAllRanges(); status.textContent = 'Please wait for saved phrases to finish loading.'; return; }
-  const range = selection.getRangeAt(0);
-  const selected = [...passage.querySelectorAll('.word')].filter(word => { try { return range.intersectsNode(word); } catch { return false; } });
-  if (!selected.length) return;
-  const line = selected[0].closest('.verse-line');
-  if (!selected.every(word => word.closest('.verse-line') === line)) { selection.removeAllRanges(); status.textContent = 'Select words from one verse at a time.'; return; }
-  const verse = Number(line.dataset.verse);
-  const indices = selected.map(word => Number(word.dataset.word));
-  const start = Math.min(...indices), end = Math.max(...indices);
-  const overlaps = groups.filter(group => group.verse === verse && group.start <= end && group.end >= start);
-  if (overlaps.length) {
-    try {
-      await Promise.all(overlaps.map(group => deleteRemoteRecording(group.id)));
-      const ids = overlaps.map(group => group.id).join(',');
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/${GROUP_TABLE}?id=in.(${ids})`, { method: 'DELETE', headers: apiHeaders() });
-      if (!response.ok) throw new Error('Phrase delete failed');
-      groups = groups.filter(group => !overlaps.includes(group));
-      status.textContent = `Cleared the selected phrase in verse ${verse}.`;
-    } catch (error) { status.textContent = 'The phrase could not be cleared. Please try again.'; }
-  } else {
-    const color = groups.length && groups.at(-1).color === 1 ? 2 : 1;
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/${GROUP_TABLE}`, {
-        method: 'POST', headers: apiHeaders({ Prefer: 'return=representation' }),
-        body: JSON.stringify({ verse, start_word: start, end_word: end, color })
-      });
-      if (!response.ok) throw new Error('Phrase save failed');
-      const [saved] = await response.json();
-      groups.push({ id: saved.id, verse, start, end, color });
-      status.textContent = `Saved a phrase in verse ${verse}. Select it to record audio.`;
-    } catch (error) { status.textContent = 'The phrase could not be saved. Please try again.'; }
-  }
-  selection.removeAllRanges(); render();
-});
+passage.addEventListener('dblclick', event => event.preventDefault());
 
 async function openGroup(id) {
   selectedGroup = groups.find(group => group.id === Number(id));
