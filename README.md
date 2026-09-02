@@ -14,4 +14,3 @@ Open `index.html` directly, or serve the folder locally. To publish with GitHub 
 - Highlighted phrases are not clickable; hover playback remains enabled.
 - Phrase groups are read-only in both the interface and Supabase, and recording deletion is blocked, so clicks, double-clicks, selections, and stale cached clients cannot remove highlights or audio.
 - A temporary “Record missing audio” repair control appears only while a displayed phrase has no recording; it can add or replace audio but cannot delete phrases or files.
-- “Re-record phrase” enables a one-shot selection mode for safely replacing any existing phrase recording while ordinary phrase clicks remain inert.
