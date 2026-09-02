@@ -12,6 +12,7 @@ const dialog = document.querySelector('#recorder-dialog');
 const phraseNode = document.querySelector('#recorder-phrase');
 const recordButton = document.querySelector('#record-button');
 const recordMissingButton = document.querySelector('#record-missing-button');
+const rerecordButton = document.querySelector('#rerecord-button');
 const playButton = document.querySelector('#play-button');
 const deleteButton = document.querySelector('#delete-recording-button');
 const SUPABASE_URL = 'https://fgomaujsdblpzxhnnqrg.supabase.co';
@@ -35,6 +36,7 @@ let activeAudio = null;
 let hoveredGroupId = null;
 let activeVersePlayback = null;
 let verseAudioContext = null;
+let rerecordMode = false;
 
 function wordsFor(verse) { return VERSES[verse - 40].split(/\s+/); }
 function phraseFor(group) { return wordsFor(group.verse).slice(group.start, group.end + 1).join(' '); }
@@ -49,6 +51,15 @@ function updateRecordingRepairControl() {
   const missing = missingRecordingGroups();
   recordMissingButton.hidden = !missing.length;
   recordMissingButton.textContent = missing.length === 1 ? 'Record missing audio' : `Record missing audio (${missing.length})`;
+}
+function setRerecordMode(enabled) {
+  rerecordMode = enabled;
+  rerecordButton.classList.toggle('active', enabled);
+  rerecordButton.textContent = enabled ? 'Select a phrase…' : 'Re-record phrase';
+  passage.classList.toggle('rerecord-mode', enabled);
+  status.textContent = enabled
+    ? 'Select the highlighted phrase whose audio you want to replace.'
+    : 'Hover over a highlighted phrase to hear it, or select a verse number.';
 }
 
 async function uploadRecording(groupId, blob) {
@@ -323,6 +334,7 @@ recordMissingButton.addEventListener('click', () => {
   const [group] = missingRecordingGroups();
   if (group) openGroup(group.id);
 });
+rerecordButton.addEventListener('click', () => setRerecordMode(!rerecordMode));
 deleteButton.addEventListener('click', async () => {
   if (!selectedGroup) return;
   try {
@@ -333,7 +345,7 @@ deleteButton.addEventListener('click', async () => {
 
 passage.addEventListener('mouseover', async event => {
   const target = event.target.closest('[data-group-id]');
-  if (!target || !audioEnabled) return;
+  if (!target || !audioEnabled || rerecordMode) return;
   const id = Number(target.dataset.groupId);
   if (hoveredGroupId === id) return;
   hoveredGroupId = id;
@@ -359,6 +371,14 @@ passage.addEventListener('mouseout', event => {
 });
 
 passage.addEventListener('click', async event => {
+  const phrase = event.target.closest('[data-group-id]');
+  if (rerecordMode && phrase) {
+    const groupId = Number(phrase.dataset.groupId);
+    setRerecordMode(false);
+    openGroup(groupId);
+    event.preventDefault();
+    return;
+  }
   const button = event.target.closest('.verse-number'); if (!button || !audioEnabled) return;
   const verse = Number(button.dataset.verse);
   if (activeVersePlayback?.verse === verse) { stopVersePlayback(`Verse ${verse} playback stopped.`); return; }

@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.1.6">
+  <link rel="stylesheet" href="styles.css?v=1.1.7">
 </head>
 <body>
   <main class="page">
@@ -24,6 +24,7 @@
         </label>
         <span class="display-controls-spacer" aria-hidden="true"></span>
         <button class="display-toggle recording-repair" id="record-missing-button" type="button" hidden>Record missing audio</button>
+        <button class="display-toggle recording-repair" id="rerecord-button" type="button">Re-record phrase</button>
         <button class="display-toggle active" id="trope-toggle" type="button" aria-pressed="true">Trope</button>
       </div>
     </header>
@@ -31,7 +32,7 @@
     <section class="passage-card" id="passage" aria-label="I Kings chapter 7, verses 40 through 42"></section>
     <p class="status" id="status" aria-live="polite">Hover over a highlighted phrase to hear it, or select a verse number.</p>
     <p class="privacy">Shared phrase recordings saved with Supabase.</p>
-    <p class="version">Version 1.1.6</p>
+    <p class="version">Version 1.1.7</p>
   </main>
 
   <dialog id="recorder-dialog">
@@ -47,6 +48,6 @@
     </form>
   </dialog>
 
-  <script src="app.js?v=1.1.6"></script>
+  <script src="app.js?v=1.1.7"></script>
 </body>
 </html>

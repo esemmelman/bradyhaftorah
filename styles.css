@@ -20,6 +20,7 @@ h1 { margin:0 0 18px; font-size:clamp(1.35rem,3vw,2rem); font-weight:400; }
 .display-toggle { min-width:84px; border:1px solid #cab98f; border-radius:999px; padding:9px 16px; color:var(--ink); background:#fffaf0; cursor:pointer; font:600 .8rem/1 Arial,sans-serif; }
 .display-toggle:hover,.display-toggle.active { border-color:var(--green); color:white; background:var(--green); }
 .recording-repair { min-width:auto; color:#8b3229; border-color:#c99b94; }
+.passage-card.rerecord-mode .word[data-group-id],.passage-card.rerecord-mode .word-space[data-group-id] { cursor:crosshair; outline:2px solid rgba(139,50,41,.25); outline-offset:1px; }
 .passage-card { position:relative; width:100%; padding:clamp(54px,8vw,88px) clamp(25px,7vw,80px) 50px; border:1px solid rgba(82,70,45,.22); border-radius:4px; background:rgba(255,253,247,.91); box-shadow:0 20px 55px rgba(72,57,31,.14),inset 0 0 55px rgba(183,133,53,.04); user-select:none; -webkit-user-select:none; }
 .passage-card::before,.passage-card::after { content:"◆"; position:absolute; top:18px; color:var(--gold); font-size:.65rem; }
 .passage-card::before { left:22px; } .passage-card::after { right:22px; }
