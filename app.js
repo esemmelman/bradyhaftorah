@@ -251,7 +251,7 @@ recordButton.addEventListener('click', async () => {
   } catch { status.textContent = 'Microphone permission is needed to record.'; }
 });
 
-async function playGroup(group, mark = true, stillRelevant = () => true) {
+async function playGroup(group, mark = true, stillRelevant = () => true, trimTailMs = 0) {
   if (!audioEnabled) return false;
   const recording = recordings.get(group.id); if (!recording) return false;
   if (!stillRelevant()) return false;
@@ -259,7 +259,29 @@ async function playGroup(group, mark = true, stillRelevant = () => true) {
   const url = recordingUrl(recording); activeAudio = new Audio(url);
   if (mark) passage.querySelectorAll(`[data-group-id="${group.id}"]`).forEach(node => node.classList.add('audio-active'));
   const playingAudio = activeAudio;
-  await new Promise(resolve => { playingAudio.onended = resolve; playingAudio.onerror = resolve; playingAudio.play().catch(resolve); });
+  await new Promise(resolve => {
+    let tailTimer = null;
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(tailTimer);
+      resolve();
+    };
+    const scheduleShorterTail = () => {
+      if (!trimTailMs || tailTimer || !Number.isFinite(playingAudio.duration)) return;
+      const durationMs = playingAudio.duration * 1000;
+      if (durationMs <= trimTailMs + 200) return;
+      tailTimer = setTimeout(() => {
+        playingAudio.pause();
+        finish();
+      }, durationMs - trimTailMs);
+    };
+    playingAudio.onloadedmetadata = scheduleShorterTail;
+    playingAudio.onended = finish;
+    playingAudio.onerror = finish;
+    playingAudio.play().then(scheduleShorterTail).catch(finish);
+  });
   if (activeAudio === playingAudio) {
     passage.querySelectorAll('.audio-active').forEach(node => node.classList.remove('audio-active'));
     activeAudio = null;
@@ -308,7 +330,7 @@ passage.addEventListener('click', async event => {
   const verse = Number(button.dataset.verse); const queue = groups.filter(group => group.verse === verse).sort((a,b) => a.start - b.start);
   if (!queue.length) { status.textContent = `Verse ${verse} has no phrase recordings yet.`; return; }
   button.classList.add('playing'); button.textContent = '■'; status.textContent = `Playing verse ${verse}.`;
-  for (const group of queue) await playGroup(group);
+  for (const group of queue) await playGroup(group, true, () => true, 120);
   button.classList.remove('playing'); button.textContent = verse; status.textContent = `Verse ${verse} complete.`;
 });
 
