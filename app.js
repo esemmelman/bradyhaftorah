@@ -11,6 +11,7 @@ const audioToggle = document.querySelector('#audio-toggle');
 const dialog = document.querySelector('#recorder-dialog');
 const phraseNode = document.querySelector('#recorder-phrase');
 const recordButton = document.querySelector('#record-button');
+const recordMissingButton = document.querySelector('#record-missing-button');
 const playButton = document.querySelector('#play-button');
 const deleteButton = document.querySelector('#delete-recording-button');
 const SUPABASE_URL = 'https://fgomaujsdblpzxhnnqrg.supabase.co';
@@ -43,6 +44,12 @@ function apiHeaders(extra = {}) { return { apikey: SUPABASE_KEY, 'Content-Type':
 function recordingUrl(recording) { return `${SUPABASE_URL}/storage/v1/object/public/${RECORDING_BUCKET}/${recording.object_path}?v=${encodeURIComponent(recording.updated_at || recording.byte_size)}`; }
 function recordingExtension(mimeType) { if (mimeType.includes('ogg')) return 'ogg'; if (mimeType.includes('mp4')) return 'mp4'; return 'webm'; }
 function preferredRecordingType() { const types = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4']; return types.find(type => MediaRecorder.isTypeSupported(type)) || ''; }
+function missingRecordingGroups() { return groups.filter(group => group.verse <= 42 && !recordings.has(group.id)); }
+function updateRecordingRepairControl() {
+  const missing = missingRecordingGroups();
+  recordMissingButton.hidden = !missing.length;
+  recordMissingButton.textContent = missing.length === 1 ? 'Record missing audio' : `Record missing audio (${missing.length})`;
+}
 
 async function uploadRecording(groupId, blob) {
   const mimeType = blob.type.split(';')[0] || 'audio/webm';
@@ -123,7 +130,7 @@ async function loadRemoteState() {
     if (!groupResponse.ok || !recordingResponse.ok) throw new Error('Supabase load failed');
     groups = (await groupResponse.json()).map(item => ({ id: item.id, verse: item.verse, start: item.start_word, end: item.end_word, color: item.color }));
     recordings.clear(); (await recordingResponse.json()).forEach(item => recordings.set(item.highlight_group_id, item));
-    remoteReady = true; render();
+    remoteReady = true; render(); updateRecordingRepairControl();
     status.textContent = 'Select words to create a phrase, or hover over a recorded phrase to hear it.';
   } catch (error) {
     status.textContent = 'Saved phrases and recordings could not be loaded. Please refresh and try again.';
@@ -201,6 +208,7 @@ recordButton.addEventListener('click', async () => {
       const group = recordingGroup;
       try {
         await uploadRecording(group.id, new Blob(chunks, { type:recorder.mimeType || mimeType || 'audio/webm' }));
+        updateRecordingRepairControl();
         recordButton.textContent = '● Record again'; playButton.disabled = !audioEnabled; deleteButton.disabled = false;
         status.textContent = `Recording saved to Supabase for verse ${group.verse}.`;
       } catch (error) { status.textContent = 'The recording could not be saved. Please record it again.'; }
@@ -311,6 +319,10 @@ async function playTrimmedVerse(queue, button, verse) {
   }
 }
 playButton.addEventListener('click', () => selectedGroup && playGroup(selectedGroup));
+recordMissingButton.addEventListener('click', () => {
+  const [group] = missingRecordingGroups();
+  if (group) openGroup(group.id);
+});
 deleteButton.addEventListener('click', async () => {
   if (!selectedGroup) return;
   try {

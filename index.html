@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.1.5">
+  <link rel="stylesheet" href="styles.css?v=1.1.6">
 </head>
 <body>
   <main class="page">
@@ -23,6 +23,7 @@
           <span class="audio-toggle-track" aria-hidden="true"></span>
         </label>
         <span class="display-controls-spacer" aria-hidden="true"></span>
+        <button class="display-toggle recording-repair" id="record-missing-button" type="button" hidden>Record missing audio</button>
         <button class="display-toggle active" id="trope-toggle" type="button" aria-pressed="true">Trope</button>
       </div>
     </header>
@@ -30,7 +31,7 @@
     <section class="passage-card" id="passage" aria-label="I Kings chapter 7, verses 40 through 42"></section>
     <p class="status" id="status" aria-live="polite">Hover over a highlighted phrase to hear it, or select a verse number.</p>
     <p class="privacy">Shared phrase recordings saved with Supabase.</p>
-    <p class="version">Version 1.1.5</p>
+    <p class="version">Version 1.1.6</p>
   </main>
 
   <dialog id="recorder-dialog">
@@ -38,7 +39,7 @@
       <p class="dialog-label" id="recorder-label">Phrase</p>
       <p class="dialog-phrase" id="recorder-phrase" dir="rtl" lang="he"></p>
       <div class="dialog-actions">
-        <button id="record-button" type="button" hidden>● Record</button>
+        <button id="record-button" type="button">● Record</button>
         <button id="play-button" type="button">▶ Play</button>
         <button id="delete-recording-button" type="button" hidden>Delete recording</button>
         <button value="close">Done</button>
@@ -46,6 +47,6 @@
     </form>
   </dialog>
 
-  <script src="app.js?v=1.1.5"></script>
+  <script src="app.js?v=1.1.6"></script>
 </body>
 </html>

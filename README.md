@@ -12,4 +12,5 @@ Open `index.html` directly, or serve the folder locally. To publish with GitHub 
 - Verse playback detects and removes leading and trailing silence, retaining a subtle 75 ms scheduled pause between phrases.
 - Recording controls are hidden in the finished trainer; saved phrase and verse playback remain available.
 - Highlighted phrases are not clickable; hover playback remains enabled.
-- The finished trainer is read-only in both the interface and Supabase, so clicks, double-clicks, selections, and stale cached clients cannot alter groups or recordings.
+- Phrase groups are read-only in both the interface and Supabase, and recording deletion is blocked, so clicks, double-clicks, selections, and stale cached clients cannot remove highlights or audio.
+- A temporary “Record missing audio” repair control appears only while a displayed phrase has no recording; it can add or replace audio but cannot delete phrases or files.
