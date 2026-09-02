@@ -154,9 +154,7 @@ function render() {
 }
 
 passage.addEventListener('mouseup', async event => {
-  const clicked = event.target.closest('[data-group-id]');
   const selection = window.getSelection();
-  if ((!selection || selection.isCollapsed) && clicked) { openGroup(clicked.dataset.groupId); return; }
   if (!selection || selection.isCollapsed || !selection.rangeCount) return;
   if (!remoteReady) { selection.removeAllRanges(); status.textContent = 'Please wait for saved phrases to finish loading.'; return; }
   const range = selection.getRangeAt(0);

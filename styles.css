@@ -29,7 +29,7 @@ h1 { margin:0 0 18px; font-size:clamp(1.35rem,3vw,2rem); font-weight:400; }
 .word { border-radius:.12em; box-decoration-break:clone; -webkit-box-decoration-break:clone; }
 .word.highlight-1,.word-space.highlight-1 { color:#76500f; background:#f3d88e; }
 .word.highlight-2,.word-space.highlight-2 { color:#244b3a; background:#bcdac8; }
-.word[data-group-id],.word-space[data-group-id] { cursor:pointer; }
+.word[data-group-id],.word-space[data-group-id] { cursor:default; }
 .word.audio-active,.word-space.audio-active { color:#17251d; font-weight:700; }
 .status { min-height:1.3em; margin:22px 0 4px; color:var(--muted); font-style:italic; }
 .privacy { margin:0; color:var(--muted); font: .72rem/1.4 Arial,sans-serif; }
