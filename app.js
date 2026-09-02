@@ -1,10 +1,7 @@
 const VERSES = [
   'וַיַּ֣עַשׂ חִיר֔וֹם אֶ֨ת־הַכִּיֹּר֔וֹת וְאֶת־הַיָּעִ֖ים וְאֶת־הַמִּזְרָק֑וֹת וַיְכַ֣ל חִירָ֗ם לַֽעֲשׂוֹת֙ אֶת־כׇּל־הַמְּלָאכָ֔ה אֲשֶׁ֥ר עָשָׂ֛ה לַמֶּ֥לֶךְ שְׁלֹמֹ֖ה בֵּ֥ית יְהֹוָֽה׃',
   'עַמֻּדִ֣ים שְׁנַ֔יִם וְגֻלֹּ֧ת הַכֹּתָרֹ֛ת אֲשֶׁר־עַל־רֹ֥אשׁ הָעַמּוּדִ֖ים שְׁתָּ֑יִם וְהַשְּׂבָכ֣וֹת שְׁתַּ֔יִם לְכַסּ֗וֹת אֶת־שְׁתֵּי֙ גֻּלּ֣וֹת הַכֹּתָרֹ֔ת אֲשֶׁ֖ר עַל־רֹ֥אשׁ הָעַמּוּדִֽים׃',
-  'וְאֶת־הָרִמֹּנִ֛ים אַרְבַּ֥ע מֵא֖וֹת לִשְׁתֵּ֣י הַשְּׂבָכ֑וֹת שְׁנֵֽי־טוּרִ֤ים רִמֹּנִים֙ לַשְּׂבָכָ֣ה הָאֶחָ֔ת לְכַסּ֗וֹת אֶת־שְׁתֵּי֙ גֻּלּ֣וֹת הַכֹּתָרֹ֔ת אֲשֶׁ֖ר עַל־פְּנֵ֥י הָעַמּוּדִֽים׃',
-  'וְאֶת־הַמְּכֹנ֖וֹת עָ֑שֶׂר וְאֶת־הַכִּיֹּרֹ֥ת עֲשָׂרָ֖ה עַל־הַמְּכֹנֽוֹת׃',
-  'וְאֶת־הַיָּ֖ם הָאֶחָ֑ד וְאֶת־הַבָּקָ֥ר שְׁנֵים־עָשָׂ֖ר תַּ֥חַת הַיָּֽם׃',
-  'וְאֶת־הַסִּיר֨וֹת וְאֶת־הַיָּעִ֜ים וְאֶת־הַמִּזְרָק֗וֹת וְאֵת֙ כׇּל־הַכֵּלִ֣ים הָאֵ֔לֶּה אֲשֶׁ֨ר עָשָׂ֥ה חִירָ֛ם לַמֶּ֥לֶךְ שְׁלֹמֹ֖ה בֵּ֣ית יְהֹוָ֑ה נְחֹ֖שֶׁת מְמֹרָֽט׃'
+  'וְאֶת־הָרִמֹּנִ֛ים אַרְבַּ֥ע מֵא֖וֹת לִשְׁתֵּ֣י הַשְּׂבָכ֑וֹת שְׁנֵֽי־טוּרִ֤ים רִמֹּנִים֙ לַשְּׂבָכָ֣ה הָאֶחָ֔ת לְכַסּ֗וֹת אֶת־שְׁתֵּי֙ גֻּלּ֣וֹת הַכֹּתָרֹ֔ת אֲשֶׁ֖ר עַל־פְּנֵ֥י הָעַמּוּדִֽים׃'
 ];
 
 const passage = document.querySelector('#passage');
@@ -121,7 +118,7 @@ async function loadRemoteState() {
   try {
     await migrateLocalData();
     const [groupResponse, recordingResponse] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/${GROUP_TABLE}?select=id,verse,start_word,end_word,color&order=id.asc`, { headers: apiHeaders() }),
+      fetch(`${SUPABASE_URL}/rest/v1/${GROUP_TABLE}?verse=lte.42&select=id,verse,start_word,end_word,color&order=id.asc`, { headers: apiHeaders() }),
       fetch(`${SUPABASE_URL}/rest/v1/${RECORDING_TABLE}?select=highlight_group_id,object_path,mime_type,byte_size,updated_at`, { headers: apiHeaders() })
     ]);
     if (!groupResponse.ok || !recordingResponse.ok) throw new Error('Supabase load failed');

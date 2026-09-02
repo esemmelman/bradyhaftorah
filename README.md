@@ -1,6 +1,6 @@
 # Brady Haftarah Trainer
 
-An interactive, static haftarah trainer for **I Kings 7:40–45**, patterned after the Brady Torah trainer.
+An interactive, static haftarah trainer for **I Kings 7:40–42**, patterned after the Brady Torah trainer.
 
 Open `index.html` directly, or serve the folder locally. To publish with GitHub Pages, enable Pages for the repository's main branch.
 
